@@ -3,15 +3,63 @@
 /*
 Plugin Name: Word Count and Read Time 
 Description: A truly amazing plugin custom plugin class
-Version: 1.1
+Version: 1.1.1
 Author: Dev Don
 Author URI: https://devdon.com.br
+Text Domain: wcpdomain
+Domain Path: /languages
 */
 
 class WordCountAndTimePlugin {
  function __construct() {
    add_action('admin_menu',array($this, 'adminPage'));
    add_action('admin_init',array($this, 'settings'));
+   add_filter('the_content', array($this, 'ifWrap'));
+   add_action('init', array($this, 'languages'));
+ }
+
+ function languages() {
+  load_plugin_textdomain('wcpdomain', false, dirname(plugin_basename(__FILE__)) . '/languages');
+ }
+
+ function ifWrap($content) {
+  if (is_main_query() AND is_single() AND 
+  (
+    get_option('wcp_wordcount', '1') OR 
+    get_option('wcp_charcount', '1') OR
+    get_option('wcp_readtime', '1')
+  )) {
+    return $this->createHTML($content); 
+  } 
+    return $content;
+ }
+
+ function createHTML($content) {
+  $html = '<h3>' . esc_html(get_option('wcp_headline', 'Post Statistics')) . '</h3><p>';
+
+  // get word count once because both wordcount and red time will need it
+  if (get_option('wcp_wordcount', '1') OR get_option('wcp_readtime', '1')) {
+    $wordCount = str_word_count(strip_tags($content));
+  }
+
+  if (get_option('wcp_wordcount', '1')) {
+    $html .= esc_html__('This post has', 'wcpdomain') . ' ' . $wordCount . ' ' . esc_html__('words', 'wcpdomain') . '.</br>';
+  }
+
+  if (get_option('wcp_charcount', '1')) {
+    $html .= esc_html__('This post has', 'wcpdomain') . ' ' . strlen(strip_tags($content)) . ' ' . esc_html__('characters', 'wcpdomain') . '.</br>';
+  }
+
+  if (get_option('wcp_readtime', '1')) {
+    $html .=  esc_html__('This post will take about', 'wcpdomain') . ' '. round($wordCount/225) . ' ' . esc_html__('minute(s) to read', 'wcpdomain') . '.</br>';
+  }
+  
+  $html .= '</p>';
+
+  if (get_option('wcp_location', '0')  == '0') {
+    return $html . $content;
+  }
+   return $content .$html;
  }
 
  function settings(){
@@ -21,15 +69,15 @@ class WordCountAndTimePlugin {
   register_setting('wordcountplugin','wcp_location', array('sanitize_callback' => array($this, 'sanitizeLocation'), 'default' => '0' ));
 
   add_settings_field( 'wcp_headline', 'Headline Text', array($this, 'headlineHTML'), 'word-count-settings-page', 'wcp_first_section' );
-  register_setting('wordcountplugin','wcp_headline', array('sanitize_callback' => 'sanitize_text_field', 'default' => 'Post Statistics' ));
+  register_setting('wordcountplugin','wcp_headline', array('sanitize_callback' => 'sanitize_text_field', 'default' => esc_html__('Post Statistics', 'wcpdomain') ));
 
-  add_settings_field( 'wcp_wordcount', 'Word Count', array($this, 'wordcountHTML'), 'word-count-settings-page', 'wcp_first_section', array('theName' => 'wcp_wordcount'));
+  add_settings_field( 'wcp_wordcount', 'Word Count', array($this, 'checkboxHTML'), 'word-count-settings-page', 'wcp_first_section', array('theName' => 'wcp_wordcount'));
   register_setting('wordcountplugin','wcp_wordcount', array('sanitize_callback' => 'sanitize_text_field', 'default' => '1' ));
 
-  add_settings_field( 'wcp_charcount', 'Character Count', array($this, 'charcountHTML'), 'word-count-settings-page', 'wcp_first_section', array('theName' => 'wcp_charcount'));
+  add_settings_field( 'wcp_charcount', 'Character Count', array($this, 'checkboxHTML'), 'word-count-settings-page', 'wcp_first_section', array('theName' => 'wcp_charcount'));
   register_setting('wordcountplugin','wcp_charcount', array('sanitize_callback' => 'sanitize_text_field', 'default' => '1' ));
 
-  add_settings_field( 'wcp_readtime', 'Read Time Count', array($this, 'readtimeHTML'), 'word-count-settings-page', 'wcp_first_section', array('theName' => 'wcp_readtime'));
+  add_settings_field( 'wcp_readtime', 'Read Time Count', array($this, 'checkboxHTML'), 'word-count-settings-page', 'wcp_first_section', array('theName' => 'wcp_readtime'));
   register_setting('wordcountplugin','wcp_readtime', array('sanitize_callback' => 'sanitize_text_field', 'default' => '1' ));
  }
 
@@ -71,7 +119,7 @@ function sanitizeLocation($input) {
 <?php }
 
  function adminPage(){
-   add_options_page('Word Count Settings','Word Count','manage_options','word-count-settings-page',array($this,'settingPageHTML'));
+   add_options_page('Word Count Settings',esc_html__('Word Count', 'wcpdomain'),'manage_options','word-count-settings-page',array($this,'settingPageHTML'));
  }
 
  function settingPageHTML(){ ?>
